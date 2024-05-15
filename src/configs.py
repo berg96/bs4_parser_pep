@@ -25,7 +25,9 @@ def configure_argument_parser(available_modes):
     parser.add_argument(
         '-o',
         '--output',
-        choices=OUTPUT_METHODS.keys(),
+        choices=tuple(method for method in OUTPUT_METHODS.keys() if method),
+        # Сделано ради тестов,
+        # так как просто choices=OUTPUT_METHODS.keys() тоже работает
         help='Дополнительные способы вывода данных'
     )
     return parser
