@@ -38,7 +38,7 @@ tg: [@Berg1005](https://t.me/berg1005)
 ```
 git clone git@github.com:berg96/bs4_parser_pep.git
 ```
-Перейти в папку с проектом, далее в папку src, где лежит файл main.py:
+Перейти в папку src:
 ```
 cd src/
 ```
