@@ -1,26 +1,27 @@
-import logging
-
+from bs4 import BeautifulSoup
 from requests import RequestException
 
 from exceptions import ParserFindTagException
 
+LOADING_URL_ERROR = 'Возникла ошибка при загрузке страницы {}'
+TAG_NOT_FOUND_ERROR = 'Не найден тег {} {}'
 
-def get_response(session, url):
+
+def get_response(session, url, encoding='utf-8'):
     try:
         response = session.get(url)
-        response.encoding = 'utf-8'
+        response.encoding = encoding
         return response
-    except RequestException:
-        logging.exception(
-            f'Возникла ошибка при загрузке страницы {url}',
-            stack_info=True
-        )
+    except RequestException as error:
+        raise ConnectionError(error, LOADING_URL_ERROR.format(url))
 
 
 def find_tag(soup, tag, attrs=None):
-    searched_tag = soup.find(tag, attrs=(attrs or {}))
+    searched_tag = soup.find(tag, attrs=({} if attrs is None else attrs))
     if searched_tag is None:
-        error_msg = f'Не найден тег {tag} {attrs}'
-        logging.error(error_msg, stack_info=True)
-        raise ParserFindTagException(error_msg)
+        raise ParserFindTagException(TAG_NOT_FOUND_ERROR.format(tag, attrs))
     return searched_tag
+
+
+def cook_soup(session, url):
+    return BeautifulSoup(get_response(session, url).text, features='lxml')
