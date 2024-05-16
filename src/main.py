@@ -27,6 +27,10 @@ UNEXPECTED_STATUS = (
     '\nОжидаемые статусы: {statuses_in_table}'
 )
 UNEXPECTED_STATUSES = 'Несовпадающие статусы:\n{}'
+HEADER_WHATS_NEW = ('Ссылка на статью', 'Заголовок', 'Редактор, Автор')
+HEADER_LATEST_VERSION = ('Ссылка на документацию', 'Версия', 'Статус')
+HEADER_PEP = ('Статус', 'Количество')
+FOOTER_PEP = 'Всего'
 
 
 def whats_new(session):
@@ -35,7 +39,7 @@ def whats_new(session):
     a_tags = soup.select(
         '#what-s-new-in-python div.toctree-wrapper li.toctree-l1 > a'
     )
-    results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
+    results = [HEADER_WHATS_NEW]
     errors = []
     for a_tag in tqdm(a_tags):
         try:
@@ -43,7 +47,8 @@ def whats_new(session):
             soup = cook_soup(session, version_link)
             results.append(
                 (
-                    version_link, find_tag(soup, 'h1').text,
+                    version_link,
+                    find_tag(soup, 'h1').text,
                     find_tag(soup, 'dl').text.replace('\n', ' ')
                 )
             )
@@ -72,7 +77,7 @@ def latest_versions(session):
             break
         else:
             raise ElementNotFoundError(NOT_FOUND_ERROR)
-    results = [('Ссылка на документацию', 'Версия', 'Статус')]
+    results = [HEADER_LATEST_VERSION]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
         text_match = re.search(pattern, a_tag.text)
@@ -146,9 +151,9 @@ def pep(session):
             UNEXPECTED_STATUSES.format('\n'.join(unexpected_statuses))
         )
     return [
-        ('Статус', 'Количество'),
+        HEADER_PEP,
         *statuses.items(),
-        ('Всего', sum(statuses.values())),
+        (FOOTER_PEP, sum(statuses.values())),
     ]
 
 
