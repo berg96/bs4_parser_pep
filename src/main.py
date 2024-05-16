@@ -7,8 +7,10 @@ import requests_cache
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
-from constants import BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, MAIN_PEPS_URL
-from exceptions import ParserFindTagException
+from constants import (
+    BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, MAIN_PEPS_URL, get_downloads_dir
+)
+from exceptions import ElementNotFoundError, ParserFindTagException
 from outputs import control_output
 from utils import cook_soup, find_tag
 
@@ -16,27 +18,28 @@ ARCHIVE_LOAD_MESSAGE = 'Архив был загружен и сохранён: 
 COMMAND_ARGUMENTS = 'Аргументы командной строки: {}'
 PARSER_START = 'Парсер запущен!'
 PARSER_FINISH = 'Парсер успешно завершил работу.'
-PARSER_FINISH_WITH_ERROR = 'Парсер завершил работу c ошибкой.'
-NOT_FOUND_ERROR = 'Ничего не нашлось'
+PARSER_FINISH_WITH_ERROR = 'Парсер завершил работу c ошибкой.\n{}'
+NOT_FOUND_ERROR = 'Ничего не нашлось.'
+CONNECTION_ERROR_MESSAGE = 'При обработке {url} возникла ошибка: {error}'
+NOT_FOUND_TAG_ON_URL = '{error} на {url}'
+UNEXPECTED_STATUS = (
+    '{url}\nСтатус в карточке: {status_in_cart}'
+    '\nОжидаемые статусы: {statuses_in_table}'
+)
+UNEXPECTED_STATUSES = 'Несовпадающие статусы:\n{}'
 
 
 def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
-    try:
-        soup = cook_soup(session, whats_new_url)
-    except ConnectionError as error:
-        logging.error(error)
-        return
-    sections_by_python = soup.select(
-        '#what-s-new-in-python div.toctree-wrapper li.toctree-l1'
+    soup = cook_soup(session, whats_new_url)
+    a_tags = soup.select(
+        '#what-s-new-in-python div.toctree-wrapper li.toctree-l1 > a'
     )
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
     errors = []
-    for section in tqdm(sections_by_python):
+    for a_tag in tqdm(a_tags):
         try:
-            version_link = urljoin(
-                whats_new_url, find_tag(section, 'a')['href']
-            )
+            version_link = urljoin(whats_new_url, a_tag['href'])
             soup = cook_soup(session, version_link)
             results.append(
                 (
@@ -45,22 +48,22 @@ def whats_new(session):
                 )
             )
         except ConnectionError as error:
-            errors.append(str(error))
+            errors.append(
+                CONNECTION_ERROR_MESSAGE.format(url=version_link, error=error)
+            )
             continue
         except ParserFindTagException as error:
-            errors.append(f'{error} на {version_link}')
+            errors.append(
+                NOT_FOUND_TAG_ON_URL.format(error=error, url=version_link)
+            )
             continue
     if errors:
-        logging.error('\n'.join(errors), stack_info=True)
+        logging.error('\n'.join(errors))
     return results
 
 
 def latest_versions(session):
-    try:
-        soup = cook_soup(session, MAIN_DOC_URL)
-    except ConnectionError as error:
-        logging.error(error)
-        return
+    soup = cook_soup(session, MAIN_DOC_URL)
     sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
     ul_tags = sidebar.find_all('ul')
     for ul in ul_tags:
@@ -68,7 +71,7 @@ def latest_versions(session):
             a_tags = ul.find_all('a')
             break
         else:
-            raise ValueError(NOT_FOUND_ERROR)
+            raise ElementNotFoundError(NOT_FOUND_ERROR)
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
@@ -84,19 +87,15 @@ def latest_versions(session):
 
 def download(session):
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
-    try:
-        soup = cook_soup(session, downloads_url)
-    except ConnectionError as error:
-        logging.error(error)
-        return
+    soup = cook_soup(session, downloads_url)
     pdf_a4_link = soup.select_one(
         'div[role=main] table.docutils [href$="pdf-a4.zip"]'
     )['href']
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
-    DOWNLOADS_DIR = BASE_DIR / 'downloads'
-    DOWNLOADS_DIR.mkdir(exist_ok=True)
-    archive_path = DOWNLOADS_DIR / filename
+    downloads_dir = get_downloads_dir(BASE_DIR)
+    downloads_dir.mkdir(exist_ok=True)
+    archive_path = downloads_dir / filename
     response = session.get(archive_url)
     with open(archive_path, 'wb') as file:
         file.write(response.content)
@@ -104,11 +103,7 @@ def download(session):
 
 
 def pep(session):
-    try:
-        soup = cook_soup(session, MAIN_PEPS_URL)
-    except ConnectionError as error:
-        logging.error(error)
-        return
+    soup = cook_soup(session, MAIN_PEPS_URL)
     tr_tags = soup.select('#numerical-index tbody tr')
     statuses = defaultdict(int)
     unexpected_statuses = []
@@ -123,26 +118,32 @@ def pep(session):
             )
             soup = cook_soup(session, pep_url)
         except ConnectionError as error:
-            errors.append(str(error))
+            errors.append(
+                CONNECTION_ERROR_MESSAGE.format(url=pep_url, error=error)
+            )
             continue
         except ParserFindTagException as error:
-            errors.append(f'{error} на {pep_url}')
+            errors.append(
+                NOT_FOUND_TAG_ON_URL.format(error=error, url=pep_url)
+            )
             continue
         status_in_cart = soup.find(
             string='Status'
         ).find_parent('dt').find_next_sibling().text
         if status_in_cart not in status_in_table:
-            unexpected_statuses.append('\n'.join([
-                f'{pep_url}',
-                f'Статус в карточке: {status_in_cart}',
-                f'Ожидаемые статусы: {list(status_in_table)}'
-            ]))
+            unexpected_statuses.append(
+                UNEXPECTED_STATUS.format(
+                    url=pep_url,
+                    status_in_cart=status_in_cart,
+                    statuses_in_table=list(status_in_table)
+                )
+            )
         statuses[status_in_cart] += 1
     if errors:
-        logging.error('\n'.join(errors), stack_info=True)
+        logging.error('\n'.join(errors))
     if unexpected_statuses:
         logging.error(
-            '\n'.join(('Несовпадающие статусы:', *unexpected_statuses))
+            UNEXPECTED_STATUSES.format('\n'.join(unexpected_statuses))
         )
     return [
         ('Статус', 'Количество'),
@@ -165,18 +166,19 @@ def main():
     arg_parser = configure_argument_parser(MODE_TO_FUNCTION.keys())
     args = arg_parser.parse_args()
     logging.info(COMMAND_ARGUMENTS.format(args))
-    session = requests_cache.CachedSession()
-    if args.clear_cache:
-        session.cache.clear()
-    parser_mode = args.mode
     try:
+        session = requests_cache.CachedSession()
+        if args.clear_cache:
+            session.cache.clear()
+        parser_mode = args.mode
         results = MODE_TO_FUNCTION[parser_mode](session)
         if results is not None:
             control_output(results, args)
         logging.info(PARSER_FINISH)
     except Exception as error:
-        logging.exception(PARSER_FINISH_WITH_ERROR)
-        logging.exception(error, stack_info=True)
+        logging.exception(
+            PARSER_FINISH_WITH_ERROR.format(error), stack_info=True
+        )
 
 
 if __name__ == '__main__':

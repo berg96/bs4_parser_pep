@@ -4,13 +4,11 @@ import logging
 
 from prettytable import PrettyTable
 
-from constants import BASE_DIR, DATETIME_FORMAT
+from constants import (
+    BASE_DIR, DATETIME_FORMAT, FILE_OUTPUT, PRETTY_OUTPUT, get_results_dir
+)
 
 FILE_SAVE_INFO = 'Файл с результатами был сохранён: {}'
-
-
-def control_output(results, cli_args):
-    return OUTPUT_METHODS[cli_args.output](results, cli_args)
 
 
 def default_output(results, cli_args):
@@ -28,12 +26,11 @@ def pretty_output(results, cli_args):
 
 def file_output(results, cli_args):
     parser_mode = cli_args.mode
-    now = dt.datetime.now()
-    now_formatted = now.strftime(DATETIME_FORMAT)
+    now_formatted = dt.datetime.now().strftime(DATETIME_FORMAT)
     file_name = f'{parser_mode}_{now_formatted}.csv'
-    RESULTS_DIR = BASE_DIR / 'results'
-    RESULTS_DIR.mkdir(exist_ok=True)
-    file_path = RESULTS_DIR / file_name
+    results_dir = get_results_dir(BASE_DIR)
+    results_dir.mkdir(exist_ok=True)
+    file_path = results_dir / file_name
     with open(file_path, 'w', encoding='utf-8') as f:
         writer = csv.writer(f, dialect=csv.unix_dialect)
         writer.writerows(results)
@@ -41,7 +38,11 @@ def file_output(results, cli_args):
 
 
 OUTPUT_METHODS = {
-    'pretty': pretty_output,
-    'file': file_output,
+    PRETTY_OUTPUT: pretty_output,
+    FILE_OUTPUT: file_output,
     None: default_output,
 }
+
+
+def control_output(results, cli_args):
+    return OUTPUT_METHODS[cli_args.output](results, cli_args)

@@ -21,3 +21,16 @@ EXPECTED_STATUS = {
     'W': ('Withdrawn',),
     '': ('Draft', 'Active'),
 }
+
+PRETTY_OUTPUT = 'pretty'
+FILE_OUTPUT = 'file'
+NAME_RESULTS_DIR = 'results'
+NAME_DOWNLOADS_DIR = 'downloads'
+
+
+def get_results_dir(base_dir):
+    return base_dir / NAME_RESULTS_DIR
+
+
+def get_downloads_dir(base_dir):
+    return base_dir / NAME_DOWNLOADS_DIR
