@@ -40,7 +40,7 @@ git clone git@github.com:berg96/bs4_parser_pep.git
 ```
 Перейти в папку src:
 ```
-cd src/
+cd src
 ```
 Запустить парсер с обязательным аргументом mode (whats-new|latest-versions|download|pep)
 ```
