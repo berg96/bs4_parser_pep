@@ -74,7 +74,7 @@ def latest_versions(session):
         if 'All versions' in ul.text:
             a_tags = ul.find_all('a')
             break
-    if not a_tags:
+    else:
         raise ElementNotFoundError(NOT_FOUND_ERROR)
     results = [HEADER_LATEST_VERSION]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
