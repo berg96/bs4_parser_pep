@@ -8,7 +8,8 @@ from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
 from constants import (
-    BASE_DIR, EXPECTED_STATUS, MAIN_DOC_URL, MAIN_PEPS_URL, get_downloads_dir
+    BASE_DIR, DOWNLOAD_MODE, EXPECTED_STATUS, LATEST_VERSIONS_MODE,
+    MAIN_DOC_URL, MAIN_PEPS_URL, PEP_MODE, WHATS_NEW_MODE, get_downloads_dir
 )
 from exceptions import ElementNotFoundError, ParserFindTagException
 from outputs import control_output
@@ -56,12 +57,10 @@ def whats_new(session):
             errors.append(
                 CONNECTION_ERROR_MESSAGE.format(url=version_link, error=error)
             )
-            continue
         except ParserFindTagException as error:
             errors.append(
                 NOT_FOUND_TAG_ON_URL.format(error=error, url=version_link)
             )
-            continue
     if errors:
         logging.error('\n'.join(errors))
     return results
@@ -69,14 +68,11 @@ def whats_new(session):
 
 def latest_versions(session):
     soup = cook_soup(session, MAIN_DOC_URL)
-    sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
-    ul_tags = sidebar.find_all('ul')
-    for ul in ul_tags:
-        if 'All versions' in ul.text:
-            a_tags = ul.find_all('a')
-            break
-        else:
-            raise ElementNotFoundError(NOT_FOUND_ERROR)
+    ul_tag = soup.select_one('div.sphinxsidebarwrapper ul')
+    if 'All versions' in ul_tag.text:
+        a_tags = ul_tag.find_all('a')
+    else:
+        raise ElementNotFoundError(NOT_FOUND_ERROR)
     results = [HEADER_LATEST_VERSION]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
@@ -158,10 +154,10 @@ def pep(session):
 
 
 MODE_TO_FUNCTION = {
-    'whats-new': whats_new,
-    'latest-versions': latest_versions,
-    'download': download,
-    'pep': pep,
+    WHATS_NEW_MODE: whats_new,
+    LATEST_VERSIONS_MODE: latest_versions,
+    DOWNLOAD_MODE: download,
+    PEP_MODE: pep,
 }
 
 
