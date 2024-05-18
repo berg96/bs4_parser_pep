@@ -38,6 +38,10 @@ tg: [@Berg1005](https://t.me/berg1005)
 ```
 git clone git@github.com:berg96/bs4_parser_pep.git
 ```
+Перейти в папку с проектом:
+```
+cd bs4_parser_pep
+```
 Перейти в папку src:
 ```
 cd src
