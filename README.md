@@ -40,7 +40,7 @@ git clone git@github.com:berg96/bs4_parser_pep.git
 ```
 Перейти в папку с проектом:
 ```
-cd <path to dir>/bs4_parser_pep
+cd bs4_parser_pep
 ```
 Перейти в папку src:
 ```
