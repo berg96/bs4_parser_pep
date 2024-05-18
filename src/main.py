@@ -68,10 +68,13 @@ def whats_new(session):
 
 def latest_versions(session):
     soup = cook_soup(session, MAIN_DOC_URL)
-    ul_tag = soup.select_one('div.sphinxsidebarwrapper ul')
-    if 'All versions' in ul_tag.text:
-        a_tags = ul_tag.find_all('a')
-    else:
+    sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
+    ul_tags = sidebar.find_all('ul')
+    for ul in ul_tags:
+        if 'All versions' in ul.text:
+            a_tags = ul.find_all('a')
+            break
+    if not a_tags:
         raise ElementNotFoundError(NOT_FOUND_ERROR)
     results = [HEADER_LATEST_VERSION]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
